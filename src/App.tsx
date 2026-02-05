@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 
 // ==========================================
-// 1. 類型定義
+// 1. 類型定義 (修正索引簽名問題)
 // ==========================================
 
 interface Asset {
@@ -39,7 +39,7 @@ interface Plan {
 interface HistoryRecord {
   month: string;
   meta: Record<string, any>;
-  [key: string]: any; // ⚠️ 關鍵：允許使用字串作為索引，消除紅字
+  [key: string]: any; // ⚠️ 解決索引錯誤的关键：允許使用字串變數存取屬性
 }
 
 interface AppData {
@@ -196,10 +196,10 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{top: 5, right: 10, left: 10, bottom: 0}}>
-              {/* ⚠️ 修正：使用 any 斷言解決 recharts 樣式衝突 */}
+              {/* ⚠️ 修正：移除 sorter 屬性並對樣式進行類型斷言，解決 recharts 類型衝突 */}
               <Tooltip 
-                 contentStyle={{ borderRadius: '12px', border: 'none', background: 'rgba(255, 255, 255, 0.98)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '11px', color: '#1e293b' } as any}
-                 itemStyle={{ padding: 0 } as any}
+                 contentStyle={{ borderRadius: '12px', border: 'none', background: 'rgba(255, 255, 255, 0.98)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '11px', color: '#1e293b' } as React.CSSProperties}
+                 itemStyle={{ padding: 0 } as React.CSSProperties}
                  formatter={(val: any, name: any): any => {
                    const value = Number(val);
                    const nameStr = String(name);
@@ -208,7 +208,6 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
                  }}
                  labelFormatter={(label) => `${label}月`}
                  filterNull={true}
-                 sorter={(a: any, b: any) => b.value - a.value} 
               />
               <XAxis 
                 dataKey="name" 
@@ -738,7 +737,8 @@ export default function App() {
     const newHistory = [...data.history];
     if (newHistory.length > 0) {
         const lastIdx = newHistory.length - 1;
-        const lastRecord = { 
+        // ⚠️ 修正：明確指定 lastRecord 的類型，解決索引紅字問題
+        const lastRecord: HistoryRecord = { 
             ...newHistory[lastIdx],
             meta: { ...newHistory[lastIdx].meta }
         }; 
