@@ -14,13 +14,14 @@ jobs:
       - name: Checkout 程式碼
         uses: actions/checkout@v4
 
-      - name: 安裝與建置
+      - name: 安裝套件
+        # ⚠️ 關鍵修正：加入 --legacy-peer-deps 解決截圖中的安裝衝突問題
+        run: npm install --legacy-peer-deps
+
+      - name: 建置網頁
         env:
-          # ⚠️ 解決建置失敗的關鍵：忽略 TypeScript 警告
           CI: false
-        run: |
-          npm install
-          npm run build
+        run: npx vite build
 
       - name: 發布到 gh-pages 分支
         uses: JamesIves/github-pages-deploy-action@v4
