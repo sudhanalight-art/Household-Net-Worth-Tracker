@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 
 // ==========================================
-// 1. 類型定義 (TypeScript Interfaces)
+// 1. 類型定義
 // ==========================================
 
 interface Asset {
@@ -39,7 +39,7 @@ interface Plan {
 interface HistoryRecord {
   month: string;
   meta: Record<string, any>;
-  [key: string]: any;
+  [key: string]: any; // ⚠️ 關鍵：允許使用字串作為索引，消除紅字
 }
 
 interface AppData {
@@ -196,10 +196,11 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{top: 5, right: 10, left: 10, bottom: 0}}>
+              {/* ⚠️ 修正：使用 any 斷言解決 recharts 樣式衝突 */}
               <Tooltip 
-                 contentStyle={{borderRadius: '12px', border: 'none', background: 'rgba(255, 255, 255, 0.98)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '11px', color: '#1e293b'}}
-                 itemStyle={{padding: 0}}
-                 formatter={(val: any, name: any): [string | null, string] => {
+                 contentStyle={{ borderRadius: '12px', border: 'none', background: 'rgba(255, 255, 255, 0.98)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '11px', color: '#1e293b' } as any}
+                 itemStyle={{ padding: 0 } as any}
+                 formatter={(val: any, name: any): any => {
                    const value = Number(val);
                    const nameStr = String(name);
                    if (value === 0) return [null, ''];
@@ -281,11 +282,11 @@ const DashboardView = ({
   const monthlyBalance = totalMonthlyIncome - totalMonthlyExpense;
 
   const { trends, totals } = useMemo(() => {
-    const initialTrend = { data: Array.from({length: 12}).map(() => ({ name: '', totalValue: 0 })), keys: new Set() };
+    const initialTrend = { data: Array.from({length: 12}).map(() => ({ name: '', totalValue: 0 })), keys: new Set<string>() };
     const result: any = {
-      cash: { ...initialTrend, data: [...initialTrend.data.map(d=>({...d}))], keys: new Set() },
-      stock: { ...initialTrend, data: [...initialTrend.data.map(d=>({...d}))], keys: new Set() },
-      debt: { ...initialTrend, data: [...initialTrend.data.map(d=>({...d}))], keys: new Set() },
+      cash: { ...initialTrend, data: initialTrend.data.map(d=>({...d})), keys: new Set<string>() },
+      stock: { ...initialTrend, data: initialTrend.data.map(d=>({...d})), keys: new Set<string>() },
+      debt: { ...initialTrend, data: initialTrend.data.map(d=>({...d})), keys: new Set<string>() },
     };
     
     const displayRate = rates[displayCurrency] || 1;
@@ -500,8 +501,7 @@ const EditModal = ({ isOpen, onClose, data, type, onSave }: any) => {
             amount: data.amount || '',
             frequency: data.frequency || 'monthly'
         });
-    } else {
-        // 新增模式下的預設值
+    } else if (isOpen) {
         setFormData({
             owner: 'husband',
             type: type === 'plan' ? 'expense' : 'cash',
@@ -759,7 +759,7 @@ export default function App() {
         newHistory[lastIdx] = lastRecord;
     }
 
-    setData((prev: any) => ({ 
+    setData((prev: AppData) => ({ 
         ...prev, 
         [targetList]: newList,
         history: newHistory 
@@ -797,7 +797,7 @@ export default function App() {
   if (!isConfigured) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-        <div className="bg-white w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl">
+        <div className="bg-white w-full max-sm rounded-3xl p-8 text-center shadow-2xl">
           <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 text-emerald-600">
              <Building2 size={32}/>
           </div>
