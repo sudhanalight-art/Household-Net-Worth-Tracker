@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, Loader2, LogOut, Settings, Save, 
-  Landmark, Wallet, TrendingUp, X, ChevronRight,
+  Landmark, Wallet, TrendingUp, X,
   TrendingDown, Minus, Banknote
 } from 'lucide-react';
 import { 
@@ -57,17 +57,11 @@ const ASSET_TYPES: Record<string, any> = {
   'debt':  { label: '債務', category: 'debt', icon: Banknote, color: 'text-red-600', bgColor: 'bg-red-50', barColor: '#EF4444', palette: ['#EF4444', '#F87171', '#FCA5A5', '#DC2626', '#B91C1C', '#FECACA', '#991B1B'] },
 };
 
-const FREQUENCY_OPTS: Record<string, any> = {
-  'monthly':   { label: '每月', divisor: 1 },
-  'quarterly': { label: '每季', divisor: 3 },
-  'yearly':    { label: '每年', divisor: 12 },
-};
-
 const normalizeOwner = (ownerStr: string) => {
   if (!ownerStr) return 'family';
   const s = String(ownerStr).toLowerCase().trim();
-  if (['husband', '老公', '爸爸', '老爸'].includes(s)) return 'husband';
-  if (['wife', '老婆', '媽媽', '老媽'].includes(s)) return 'wife';
+  if (['husband', '老公', '爸爸', '老爸', 'husband'].includes(s)) return 'husband';
+  if (['wife', '老婆', '媽媽', '老媽', 'wife'].includes(s)) return 'wife';
   return 'family';
 };
 
@@ -96,7 +90,7 @@ const formatMoney = (val: number) => new Intl.NumberFormat('zh-TW', { maximumFra
 const SettingsModal = ({ isOpen, onClose, currentCurrency, onCurrencyChange, onLogout }: any) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
       <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
         <div className="p-5 border-b flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-slate-700 flex items-center gap-2"><Settings size={18}/> 偏好設定</h3>
@@ -106,7 +100,7 @@ const SettingsModal = ({ isOpen, onClose, currentCurrency, onCurrencyChange, onL
           <div className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">顯示貨幣</div>
           <div className="grid grid-cols-5 gap-2 mb-6">
             {CURRENCY_LIST.map(curr => (
-              <button key={curr} onClick={() => onCurrencyChange(curr)} className={`text-[10px] font-bold py-2 rounded-lg transition-all ${currentCurrency === curr ? 'bg-slate-800 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{curr}</button>
+              <button key={curr} onClick={() => onCurrencyChange(curr)} className={`text-[10px] font-bold py-2 rounded-lg transition-all ${currentCurrency === curr ? 'bg-slate-800 text-white shadow-md' : 'bg-slate-100 text-slate-500'}`}>{curr}</button>
             ))}
           </div>
           <div className="border-t pt-4"><button onClick={onLogout} className="w-full py-3 rounded-xl bg-red-50 text-red-600 font-bold text-sm flex items-center justify-center gap-2"><LogOut size={16}/> 登出系統</button></div>
@@ -131,7 +125,8 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
     if (name === 'totalValue') return '';
     const match = name.match(/(.*)\s\((.*)\)/);
     if (match && selectedOwner === 'all') {
-        return `${getOwnerDisplayName(match[2].toLowerCase())} - ${match[1]}`;
+        const ownerLabel = getOwnerDisplayName(match[2].toLowerCase());
+        return `${ownerLabel} - ${match[1]}`;
     }
     return name.split('(')[0];
   };
@@ -169,7 +164,7 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
   );
 };
 
-const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency, onEditAsset, historyData }: any) => {
+const DashboardView = ({ accounts, rates, selectedOwner, displayCurrency, onEditAsset, historyData }: any) => {
   const { trends, totals } = useMemo(() => {
     const res: any = { cash: { data: [], keys: new Set() }, stock: { data: [], keys: new Set() }, debt: { data: [], keys: new Set() } };
     const curTotals: any = { cash: 0, stock: 0, debt: 0 };
@@ -212,18 +207,21 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
         ))}
       </div>
       <div>
-        <div className="flex justify-between items-end mb-3 px-1 mt-6"><h3 className="font-bold text-slate-700 text-sm">資產明細</h3></div>
+        <div className="flex justify-between items-end mb-3 px-1 mt-6"><h3 className="font-bold text-slate-700 text-sm">資產明細 ({getOwnerDisplayName(selectedOwner)})</h3></div>
         <div className="space-y-3">
           {accounts.map((acc: Asset) => {
             const cfg = ASSET_TYPES[normalizeType(acc.type)] || ASSET_TYPES['cash'];
             const isDebt = cfg.category === 'debt';
+            const displayName = selectedOwner === 'all' ? `${getOwnerDisplayName(acc.owner)} - ${acc.name}` : acc.name;
             return (
-              <div key={acc.id} onClick={() => onEditAsset(acc)} className={`bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:border-slate-300 transition-all ${isDebt ? 'border-l-4 border-l-red-400' : ''}`}>
+              <div key={acc.id} onClick={() => onEditAsset(acc)} className={`bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:border-slate-300 transition-all group ${isDebt ? 'border-l-4 border-l-red-400' : ''}`}>
                 <div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full ${cfg.bgColor} flex items-center justify-center ${cfg.color}`}><cfg.icon size={18} /></div>
-                  <div><div className="font-bold text-slate-700 text-sm">{selectedOwner === 'all' ? `${getOwnerDisplayName(acc.owner)} - ${acc.name}` : acc.name}</div>
+                  <div><div className="font-bold text-slate-700 text-sm">{displayName}</div>
                   <div className="text-[10px] text-slate-400 font-mono">{acc.currency}</div></div>
                 </div>
-                <div className="font-bold text-slate-800">{isDebt ? '-' : ''}${formatMoney(acc.amount || acc.balance || 0)}</div>
+                <div className="text-right">
+                  <div className={`font-bold font-mono ${isDebt ? 'text-red-600' : 'text-slate-800'}`}>{isDebt ? '-' : ''}${formatMoney(acc.amount || acc.balance || 0)}</div>
+                </div>
               </div>
             );
           })}
@@ -247,13 +245,13 @@ const EditModal = ({ isOpen, onClose, data, type, onSave }: any) => {
         <div className="flex justify-between items-center border-b pb-4"><h3 className="text-lg font-black text-slate-800">{formData.id ? '編輯' : '新增'}{isPlan ? '收支' : '資產'}</h3><button onClick={onClose} className="p-2 bg-slate-100 rounded-full text-slate-500"><X size={20}/></button></div>
         <div className="space-y-4">
           <div className="flex gap-3">
-             <div className="flex-1 space-y-1"><label className="text-xs font-bold text-slate-400">歸屬人</label><select className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold" value={normalizeOwner(formData.owner)} onChange={e => setFormData({...formData, owner: e.target.value})}><option value="husband">老公</option><option value="wife">老婆</option><option value="family">全家</option></select></div>
-             <div className="flex-1 space-y-1"><label className="text-xs font-bold text-slate-400">類型</label><select className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold" value={normalizeType(formData.type)} onChange={e => setFormData({...formData, type: e.target.value})}>{isPlan ? (<><option value="expense">支出</option><option value="income">收入</option></>) : Object.entries(ASSET_TYPES).map(([k, v]: [string, any]) => (<option key={k} value={k}>{v.label}</option>))}</select></div>
+             <div className="flex-1 space-y-1"><label className="text-xs font-bold text-slate-400">歸屬人</label><select className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold text-slate-700" value={normalizeOwner(formData.owner)} onChange={e => setFormData({...formData, owner: e.target.value})}><option value="husband">老公</option><option value="wife">老婆</option><option value="family">全家</option></select></div>
+             <div className="flex-1 space-y-1"><label className="text-xs font-bold text-slate-400">類型</label><select className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold text-slate-700" value={normalizeType(formData.type)} onChange={e => setFormData({...formData, type: e.target.value})}>{isPlan ? (<><option value="expense">支出</option><option value="income">收入</option></>) : Object.entries(ASSET_TYPES).map(([k, v]: [string, any]) => (<option key={k} value={k}>{v.label}</option>))}</select></div>
           </div>
-          <div className="space-y-1"><label className="text-xs font-bold text-slate-400">名稱</label><input type="text" className="w-full bg-slate-50 rounded-xl p-3 font-bold focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-slate-400">名稱</label><input type="text" className="w-full bg-slate-50 rounded-xl p-3 font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
           <div className="flex gap-3">
-             <div className="w-1/3 space-y-1"><label className="text-xs font-bold text-slate-400">幣別</label><select className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>{CURRENCY_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-             <div className="flex-1 space-y-1"><label className="text-xs font-bold text-slate-400">金額</label><input type="number" className="w-full bg-slate-50 rounded-xl p-3 font-bold" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /></div>
+             <div className="w-1/3 space-y-1"><label className="text-xs font-bold text-slate-400">幣別</label><select className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>{CURRENCY_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+             <div className="flex-1 space-y-1"><label className="text-xs font-bold text-slate-400">金額</label><input type="number" className="w-full bg-slate-50 rounded-xl p-3 font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /></div>
           </div>
         </div>
         <button onClick={() => onSave({...formData, amount: Number(formData.amount)})} className="w-full py-4 rounded-xl bg-slate-900 text-white font-bold shadow-lg flex justify-center items-center gap-2"><Save size={18}/> 儲存變更</button>
@@ -328,7 +326,7 @@ export default function App() {
       </div>
       <div className="px-5 -mt-4 relative z-30">
         <div className="bg-white p-1 rounded-xl shadow-lg border border-slate-100 flex mb-6">{['all', 'husband', 'wife'].map(o => (<button key={o} onClick={() => setSelectedOwner(o)} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${selectedOwner === o ? 'bg-slate-900 text-white shadow' : 'text-slate-400 hover:bg-slate-50'}`}>{getOwnerDisplayName(o)}</button>))}</div>
-        <DashboardView accounts={filteredAssets} plans={data.plans.filter(p => (selectedOwner === 'all' || normalizeOwner(p.owner) === selectedOwner))} rates={DEFAULT_RATES} selectedOwner={selectedOwner} displayCurrency={displayCurrency} onEditAsset={(item: any) => setEditModal({ isOpen: true, type: 'asset', data: item })} historyData={data.history} />
+        <DashboardView accounts={filteredAssets} rates={DEFAULT_RATES} selectedOwner={selectedOwner} displayCurrency={displayCurrency} onEditAsset={(item: any) => setEditModal({ isOpen: true, type: 'asset', data: item })} historyData={data.history} />
         <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
           <button onClick={() => setEditModal({ isOpen: true, type: 'plan', data: null })} className="w-12 h-12 rounded-full bg-orange-500 text-white shadow-lg flex items-center justify-center hover:scale-110 active:scale-90 transition-transform"><Banknote size={22}/></button>
           <button onClick={() => setEditModal({ isOpen: true, type: 'asset', data: null })} className="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-90 transition-transform"><Landmark size={24}/></button>
