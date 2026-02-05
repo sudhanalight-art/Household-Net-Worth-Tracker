@@ -16,7 +16,7 @@ jobs:
 
       - name: 安裝與建置
         env:
-          # ⚠️ 關鍵修正：忽略 TypeScript 警告與 ESLint 錯誤，強制完成建置
+          # ⚠️ 解決建置失敗的關鍵：忽略 TypeScript 警告
           CI: false
         run: |
           npm install
