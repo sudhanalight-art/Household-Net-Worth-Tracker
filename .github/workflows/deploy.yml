@@ -14,15 +14,16 @@ jobs:
       - name: Checkout 程式碼
         uses: actions/checkout@v4
 
-      - name: 安裝套件 (強制模式)
-        # ⚠️ 使用 --legacy-peer-deps 解決版本衝突
+      - name: 安裝套件
+        # ⚠️ 使用 legacy-peer-deps 避免版本衝突
         run: npm install --legacy-peer-deps
 
-      - name: 建置網頁 (忽略警告)
+      - name: 建置網頁
         env:
+          # ⚠️ 關鍵：關閉 CI 嚴格檢查模式，忽略警告
           CI: false
-        # ⚠️ 即使有警告也強制繼續
-        run: npx vite build
+        # ⚠️ 這裡只執行 vite build，不執行 tsc
+        run: npm run build
 
       - name: 發布到 gh-pages 分支
         uses: JamesIves/github-pages-deploy-action@v4
