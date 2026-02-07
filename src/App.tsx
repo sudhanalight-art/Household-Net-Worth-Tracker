@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, Loader2, LogOut, Settings, Save, 
-  Receipt, CreditCard, Landmark, Wallet, Pencil, 
-  Coins, TrendingUp, X, ChevronRight, TrendingDown, Minus, Banknote, LayoutDashboard
+  Landmark, Wallet, Pencil, TrendingUp, X, ChevronRight,
+  TrendingDown, Minus, Banknote, LayoutDashboard, AlertTriangle
 } from 'lucide-react';
 import { 
   ComposedChart, Line, Bar, XAxis, Tooltip, ResponsiveContainer
@@ -39,7 +39,7 @@ interface AppData {
 // ==========================================
 const STORAGE_KEY_API = 'sudhana_family_finance_api';
 const STORAGE_KEY_TITLE = 'sudhana_family_title';
-const CURRENT_VERSION = "修心之道家庭資產記帳本 V1.3";
+const CURRENT_VERSION = "修心之道家庭資產記帳本 V1.4";
 
 const CURRENCY_LIST = ['TWD', 'USD', 'JPY', 'EUR', 'CNY', 'AUD', 'CAD', 'CHF', 'GBP', 'HKD', 'KRW', 'SGD', 'VND'];
 
@@ -109,6 +109,7 @@ const SettingsModal = ({ isOpen, onClose, currentCurrency, onCurrencyChange, onL
   );
 };
 
+// 🌟 Tooltip 優化版：可滑動、總計置頂
 const CustomTooltip = ({ active, payload, label, selectedOwner }: any) => {
   if (active && payload && payload.length) {
     const totalItem = payload.find((p: any) => p.name === 'totalValue');
@@ -123,7 +124,7 @@ const CustomTooltip = ({ active, payload, label, selectedOwner }: any) => {
     };
 
     return (
-      <div className="bg-white/95 backdrop-blur-sm p-3 border border-slate-200 rounded-xl shadow-xl text-xs w-56 max-h-[300px] overflow-y-auto custom-scrollbar z-[9999]">
+      <div className="bg-white/95 backdrop-blur-sm p-3 border border-slate-200 rounded-xl shadow-xl text-xs w-60 max-h-[60vh] overflow-y-auto custom-scrollbar z-[9999]">
         <p className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between sticky top-0 bg-white/95">
             <span>{label}月</span>
             {totalItem && <span className="text-slate-800 font-black">${formatMoney(totalItem.value)}</span>}
@@ -154,10 +155,10 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
   const config = ASSET_TYPES[typeKey];
   const Icon = config.icon;
   const len = data.length;
-  // 移除未使用的 diff
-  const latest = len > 0 ? data[len - 1].totalValue : 0;
-  const prev = len > 1 ? data[len - 2].totalValue : latest;
-  const percent = prev !== 0 ? ((latest - prev) / prev) * 100 : 0;
+  // 修正：移除了未使用的 latest, prev, diff 變數，改為直接在計算 percent 時使用
+  const latestVal = len > 0 ? data[len - 1].totalValue : 0;
+  const prevVal = len > 1 ? data[len - 2].totalValue : latestVal;
+  const percent = prevVal !== 0 ? ((latestVal - prevVal) / prevVal) * 100 : 0;
   
   const isUp = percent > 0;
   const TrendIcon = percent === 0 ? Minus : (isUp ? TrendingUp : TrendingDown);
@@ -178,8 +179,13 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{top: 5, right: 2, left: 2, bottom: 0}}>
-              <Tooltip content={<CustomTooltip selectedOwner={selectedOwner} />} cursor={{fill: '#f8fafc'}} wrapperStyle={{ outline: 'none' }} />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#cbd5e1'}} />
+              <Tooltip 
+                 content={<CustomTooltip selectedOwner={selectedOwner} />} 
+                 cursor={{fill: '#f8fafc'}} 
+                 wrapperStyle={{ outline: 'none', pointerEvents: 'auto' }} 
+              />
+              {/* ⚠️ 修正：強制轉型 any 解決 CSSProperties 檢查問題 */}
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#cbd5e1'} as any} />
               {assetKeys.map((key: string, index: number) => (
                 <Bar key={key} dataKey={key} stackId="a" fill={getColor(index)} barSize={16} radius={index === assetKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
               ))}
@@ -221,10 +227,7 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
   const monthlyBalance = totalMonthlyIncome - totalMonthlyExpense;
 
   const { trends, totals } = useMemo(() => {
-    // 1. 初始化結構
     const initialTrend = { data: Array.from({length: 12}).map(() => ({ name: '', totalValue: 0 })), keys: new Set<string>() };
-    
-    // 2. 修正變數名稱：使用 res 替代 result
     const res: any = {
       cash: { ...initialTrend, data: [...initialTrend.data.map((d: any)=>({...d}))], keys: new Set() },
       stock: { ...initialTrend, data: [...initialTrend.data.map((d: any)=>({...d}))], keys: new Set() },
@@ -233,22 +236,18 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
     
     const displayRate = rates[displayCurrency] || 1;
 
-    // 3. 修正變數名稱：使用 curTotals 替代 currentTotals
     const curTotals: any = { cash: 0, stock: 0, debt: 0 };
-    
     (accounts || []).forEach((acc: Asset) => {
       const val = (Number(acc.amount || acc.balance || 0) * (rates[acc.currency.toUpperCase()] || 1)) / displayRate;
       const normType = normalizeType(acc.type);
       const cat = ASSET_TYPES[normType]?.category;
-      // 修正：引用 curTotals
       if (cat) curTotals[cat] += val;
     });
 
     if (historyData) {
-      historyData.slice(-12).forEach((record: any, index: number) => { // 修正：加入 index 參數
+      historyData.slice(-12).forEach((record: any, index: number) => {
         const monthLabel = record.month.split('-')[1];
         ['cash', 'stock', 'debt'].forEach(cat => {
-            // 修正：為每個月的每個類別初始化名稱
             if (res[cat].data[index]) {
                 res[cat].data[index].name = monthLabel;
             }
@@ -261,15 +260,14 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
             
             if (!m.displayName || m.displayName.trim() === '') return;
 
-            // 修正：檢查 ASSET_TYPES 是否存在
             const mType = normalizeType(m.type);
             const typeConfig = ASSET_TYPES[mType];
 
             if (typeConfig && typeConfig.category) {
                 const cat = typeConfig.category;
-                const converted = (Number(record[key]) * (rates[m.currency.toUpperCase()] || 1)) / displayRate;
+                // ⚠️ 修正：強制 record[key] 視為 any，解決 7053 紅色 X 錯誤
+                const converted = (Number((record as any)[key]) * (rates[m.currency.toUpperCase()] || 1)) / displayRate;
                 
-                // 修正：直接操作 res (而不是 result)
                 if (res[cat] && res[cat].data[index]) {
                   res[cat].data[index].totalValue += converted;
                   res[cat].data[index][m.displayName] = converted;
@@ -279,7 +277,6 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
         });
       });
     }
-    // 修正：回傳 res 和 curTotals
     return { trends: res, totals: curTotals };
   }, [historyData, selectedOwner, accounts, rates, displayCurrency]);
 
@@ -349,6 +346,7 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
                     <div><div className="font-bold text-slate-700 text-sm">{displayName}</div>
                     <div className="text-[10px] text-slate-400 font-mono">{acc.currency}</div></div></div>
                     <div className="font-bold text-slate-800">{isDebt ? '-' : ''}${formatMoney(acc.amount || acc.balance || 0)}</div>
+                    <ChevronRight size={14} className="text-slate-300 ml-auto mt-1 group-hover:text-slate-500 transition-colors"/>
                 </div>
                 );
             })}
@@ -564,7 +562,7 @@ export default function App() {
     }
   };
 
-  const filteredAssets = data.assets.filter((a: Asset) => 
+  const filteredAssets = data.assets.filter((a: any) => 
     (selectedOwner === 'all' || normalizeOwner(a.owner) === selectedOwner) &&
     Number(a.amount || 0) !== 0
   );
@@ -578,7 +576,7 @@ export default function App() {
     const displayRate = DEFAULT_RATES[displayCurrency] || 1;
     let total = 0;
     
-    filteredAssets.forEach((a: Asset) => {
+    filteredAssets.forEach((a: any) => {
        const curr = String(a.currency).toUpperCase();
        const itemRate = DEFAULT_RATES[curr] || 1;
        const val = (Number(a.amount || a.balance || 0) * itemRate) / displayRate;
@@ -620,7 +618,6 @@ export default function App() {
         
         lastRecord[uniqueKey] = finalAmount === 0 ? 0 : finalAmount;
         
-        // 修正：始終更新 Meta，確保刪除操作也能在歷史紀錄中正確分類
         lastRecord.meta[uniqueKey] = {
             name: formData.name,
             owner: ownerUpper,
@@ -632,7 +629,7 @@ export default function App() {
         newHistory[lastIdx] = lastRecord;
     }
 
-    setData((prev: AppData) => ({ 
+    setData((prev: any) => ({ 
         ...prev, 
         [targetList]: newList,
         history: newHistory 
@@ -702,7 +699,7 @@ export default function App() {
   }
 
   return (
-    <div className="max-w-md mx-auto bg-white min-h-screen relative font-sans text-slate-900">
+    <div className="w-full max-w-7xl mx-auto bg-white min-h-screen relative font-sans text-slate-900">
       
       <SettingsModal 
         isOpen={showSettings} 
@@ -777,7 +774,7 @@ export default function App() {
 
         <DashboardView 
           accounts={filteredAssets} 
-          plans={filteredPlans}
+          plans={filteredPlans} 
           rates={DEFAULT_RATES}
           selectedOwner={selectedOwner}
           displayCurrency={displayCurrency}
@@ -788,14 +785,14 @@ export default function App() {
 
         <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
           <button 
-             onClick={() => setEditModal({ isOpen: true, type: 'plan', data: null })}
+             onClick={() => setEditModal({ isOpen: true, type: 'plan', data: { owner: selectedOwner === 'all' ? 'family' : selectedOwner } })}
              className="w-12 h-12 rounded-full bg-orange-500 text-white shadow-lg flex items-center justify-center hover:scale-110 active:scale-90 transition-transform"
              title="新增收支"
           >
             <Banknote size={22}/>
           </button>
           <button 
-             onClick={() => setEditModal({ isOpen: true, type: 'asset', data: null })}
+             onClick={() => setEditModal({ isOpen: true, type: 'asset', data: { owner: selectedOwner === 'all' ? 'husband' : selectedOwner } })}
              className="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-90 transition-transform"
              title="新增資產"
           >
