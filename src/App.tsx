@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import { 
   Building2, Loader2, LogOut, Settings, Save, 
-  Landmark, Wallet, Pencil, TrendingUp, X, ChevronRight,
+  Landmark, Wallet, Pencil, Coins, TrendingUp, X, ChevronRight,
   TrendingDown, Minus, Banknote, LayoutDashboard, AlertTriangle
 } from 'lucide-react';
 import { 
@@ -39,7 +40,7 @@ interface AppData {
 // ==========================================
 const STORAGE_KEY_API = 'sudhana_family_finance_api';
 const STORAGE_KEY_TITLE = 'sudhana_family_title';
-const CURRENT_VERSION = "修心之道家庭資產記帳本 V1.4 (Fixed)";
+const CURRENT_VERSION = "修心之道家庭資產記帳本 V1.4.1";
 
 const CURRENCY_LIST = ['TWD', 'USD', 'JPY', 'EUR', 'CNY', 'AUD', 'CAD', 'CHF', 'GBP', 'HKD', 'KRW', 'SGD', 'VND'];
 
@@ -70,10 +71,10 @@ const normalizeOwner = (o: string) => {
 
 const normalizeType = (typeStr: string) => {
   const s = String(typeStr || '').toLowerCase();
-  if (s === 'stock' || s.includes('投資')) return 'stock';
-  if (s === 'debt' || s.includes('負債')) return 'debt';
-  if (s === 'expense' || s.includes('支出')) return 'expense';
-  if (s === 'income' || s.includes('收入')) return 'income';
+  if (s === 'stock' || s.includes('invest') || s.includes('etf') || s.includes('股票') || s.includes('投資') || s.includes('證券') || s.includes('基金')) return 'stock';
+  if (s === 'debt' || s.includes('loan') || s.includes('負債') || s.includes('貸款') || s.includes('借款')) return 'debt';
+  if (s === 'expense' || s.includes('支出') || s.includes('固定支出')) return 'expense';
+  if (s === 'income' || s.includes('收入') || s.includes('固定收入')) return 'income';
   return 'cash'; 
 };
 
@@ -109,7 +110,7 @@ const SettingsModal = ({ isOpen, onClose, currentCurrency, onCurrencyChange, onL
   );
 };
 
-// 🌟 Tooltip 優化版
+// 🌟 Tooltip 優化版：可滑動、總計置頂
 const CustomTooltip = ({ active, payload, label, selectedOwner }: any) => {
   if (active && payload && payload.length) {
     const totalItem = payload.find((p: any) => p.name === 'totalValue');
@@ -135,7 +136,7 @@ const CustomTooltip = ({ active, payload, label, selectedOwner }: any) => {
              return (
               <div key={index} className="flex justify-between items-center gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.fill }}></div>
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }}></div>
                     <span className="truncate text-slate-600 leading-tight scale-95 origin-left">{formatName(entry.name)}</span>
                 </div>
                 <span className="font-mono font-medium text-slate-700 shrink-0 scale-95 origin-right">
@@ -178,6 +179,7 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{top: 5, right: 2, left: 2, bottom: 0}}>
+              {/* ⚠️ Tooltip wrapperStyle pointerEvents: 'auto' 允許互動 */}
               <Tooltip 
                  content={<CustomTooltip selectedOwner={selectedOwner} />} 
                  cursor={{fill: '#f8fafc'}} 
@@ -210,11 +212,12 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
       const freq = FREQUENCY_OPTS[freqKey];
       
       const monthlyAmount = amountConverted / freq.divisor;
-      const typeStr = String(p.type).toLowerCase();
+      // ⚠️ 關鍵：使用 normalizeType 統一判斷支出
+      const typeStr = normalizeType(p.type);
       
-      if (typeStr.includes('income')) {
+      if (typeStr === 'income') {
         inc += monthlyAmount;
-      } else if (typeStr.includes('expense')) {
+      } else if (typeStr === 'expense') {
         exp += monthlyAmount;
       }
     });
@@ -226,7 +229,7 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
 
   const { trends, totals } = useMemo(() => {
     const initialTrend = { data: Array.from({length: 12}).map(() => ({ name: '', totalValue: 0 })), keys: new Set<string>() };
-    const res: any = {
+    const result: any = {
       cash: { ...initialTrend, data: [...initialTrend.data.map((d: any)=>({...d}))], keys: new Set() },
       stock: { ...initialTrend, data: [...initialTrend.data.map((d: any)=>({...d}))], keys: new Set() },
       debt: { ...initialTrend, data: [...initialTrend.data.map((d: any)=>({...d}))], keys: new Set() },
@@ -246,8 +249,8 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
       historyData.slice(-12).forEach((record: any, index: number) => {
         const monthLabel = record.month.split('-')[1];
         ['cash', 'stock', 'debt'].forEach(cat => {
-            if (res[cat].data[index]) {
-                res[cat].data[index].name = monthLabel;
+            if (result[cat].data[index]) {
+                result[cat].data[index].name = monthLabel;
             }
         });
             
@@ -265,16 +268,16 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
                 const cat = typeConfig.category;
                 const converted = (Number(record[key]) * (rates[m.currency.toUpperCase()] || 1)) / displayRate;
                 
-                if (res[cat] && res[cat].data[index]) {
-                  res[cat].data[index].totalValue += converted;
-                  res[cat].data[index][m.displayName] = converted;
-                  res[cat].keys.add(m.displayName);
+                if (result[cat] && result[cat].data[index]) {
+                  result[cat].data[index].totalValue += converted;
+                  result[cat].data[index][m.displayName] = converted;
+                  result[cat].keys.add(m.displayName);
                 }
             }
         });
       });
     }
-    return { trends: res, totals: curTotals };
+    return { trends: result, totals: curTotals };
   }, [historyData, selectedOwner, accounts, rates, displayCurrency]);
 
   return (
@@ -305,7 +308,8 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
                 <h3 className="text-sm font-bold text-slate-500 mb-3">固定收支明細</h3>
                 <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
                     {(plans || []).map((p: Plan) => {
-                        const isExp = String(p.type).includes('expense');
+                        // ⚠️ 關鍵修正：統一使用 normalizeType 判斷，確保中文類型也能識別
+                        const isExp = normalizeType(p.type) === 'expense';
                         const freq = FREQUENCY_OPTS[p.frequency.toLowerCase()]?.label || '每月';
                         const displayName = selectedOwner === 'all' ? `${getOwnerDisplayName(p.owner)} - ${p.name}` : p.name;
                         
@@ -319,6 +323,7 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
                                     </div>
                                 </div>
                                 <div className="text-right">
+                                    {/* ⚠️ 關鍵修正：若為支出，顯示紅色並加上負號 */}
                                     <div className={`font-bold ${isExp ? 'text-orange-600' : 'text-emerald-600'}`}>{isExp ? '-' : '+'}${formatMoney(p.amount)}</div>
                                     <div className="text-[10px] text-slate-300">{p.currency}</div>
                                 </div>
@@ -782,6 +787,7 @@ export default function App() {
         />
 
         <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
+          {/* ⚠️ 修正：根據當前頁籤決定預設 owner */}
           <button 
              onClick={() => setEditModal({ isOpen: true, type: 'plan', data: { owner: selectedOwner === 'all' ? 'family' : selectedOwner } })}
              className="w-12 h-12 rounded-full bg-orange-500 text-white shadow-lg flex items-center justify-center hover:scale-110 active:scale-90 transition-transform"
@@ -790,7 +796,7 @@ export default function App() {
             <Banknote size={22}/>
           </button>
           <button 
-             onClick={() => setEditModal({ isOpen: true, type: { owner: selectedOwner === 'all' ? 'husband' : selectedOwner }, data: null })}
+             onClick={() => setEditModal({ isOpen: true, type: 'asset', data: { owner: selectedOwner === 'all' ? 'husband' : selectedOwner } })}
              className="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-90 transition-transform"
              title="新增資產"
           >
