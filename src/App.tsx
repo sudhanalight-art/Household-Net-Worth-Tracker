@@ -39,7 +39,7 @@ interface AppData {
 // ==========================================
 const STORAGE_KEY_API = 'sudhana_family_finance_api';
 const STORAGE_KEY_TITLE = 'sudhana_family_title';
-const CURRENT_VERSION = "修心之道家庭資產記帳本 V1.4";
+const CURRENT_VERSION = "修心之道家庭資產記帳本 V1.4 (Fixed)";
 
 const CURRENCY_LIST = ['TWD', 'USD', 'JPY', 'EUR', 'CNY', 'AUD', 'CAD', 'CHF', 'GBP', 'HKD', 'KRW', 'SGD', 'VND'];
 
@@ -109,7 +109,7 @@ const SettingsModal = ({ isOpen, onClose, currentCurrency, onCurrencyChange, onL
   );
 };
 
-// 🌟 Tooltip 優化版：可滑動、總計置頂
+// 🌟 Tooltip 優化版
 const CustomTooltip = ({ active, payload, label, selectedOwner }: any) => {
   if (active && payload && payload.length) {
     const totalItem = payload.find((p: any) => p.name === 'totalValue');
@@ -136,9 +136,9 @@ const CustomTooltip = ({ active, payload, label, selectedOwner }: any) => {
               <div key={index} className="flex justify-between items-center gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.fill }}></div>
-                    <span className="truncate text-slate-600 leading-tight">{formatName(entry.name)}</span>
+                    <span className="truncate text-slate-600 leading-tight scale-95 origin-left">{formatName(entry.name)}</span>
                 </div>
-                <span className="font-mono font-medium text-slate-700 shrink-0">
+                <span className="font-mono font-medium text-slate-700 shrink-0 scale-95 origin-right">
                     ${formatMoney(entry.value)}
                 </span>
               </div>
@@ -155,10 +155,9 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
   const config = ASSET_TYPES[typeKey];
   const Icon = config.icon;
   const len = data.length;
-  // 修正：移除了未使用的 latest, prev, diff 變數，改為直接在計算 percent 時使用
-  const latestVal = len > 0 ? data[len - 1].totalValue : 0;
-  const prevVal = len > 1 ? data[len - 2].totalValue : latestVal;
-  const percent = prevVal !== 0 ? ((latestVal - prevVal) / prevVal) * 100 : 0;
+  const latest = len > 0 ? data[len - 1].totalValue : 0;
+  const prev = len > 1 ? data[len - 2].totalValue : latest;
+  const percent = prev !== 0 ? ((latest - prev) / prev) * 100 : 0;
   
   const isUp = percent > 0;
   const TrendIcon = percent === 0 ? Minus : (isUp ? TrendingUp : TrendingDown);
@@ -184,7 +183,6 @@ const TrendBlock = ({ title, typeKey, data, assetKeys, currentTotal, selectedOwn
                  cursor={{fill: '#f8fafc'}} 
                  wrapperStyle={{ outline: 'none', pointerEvents: 'auto' }} 
               />
-              {/* ⚠️ 修正：強制轉型 any 解決 CSSProperties 檢查問題 */}
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#cbd5e1'} as any} />
               {assetKeys.map((key: string, index: number) => (
                 <Bar key={key} dataKey={key} stackId="a" fill={getColor(index)} barSize={16} radius={index === assetKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
@@ -265,8 +263,7 @@ const DashboardView = ({ accounts, plans, rates, selectedOwner, displayCurrency,
 
             if (typeConfig && typeConfig.category) {
                 const cat = typeConfig.category;
-                // ⚠️ 修正：強制 record[key] 視為 any，解決 7053 紅色 X 錯誤
-                const converted = (Number((record as any)[key]) * (rates[m.currency.toUpperCase()] || 1)) / displayRate;
+                const converted = (Number(record[key]) * (rates[m.currency.toUpperCase()] || 1)) / displayRate;
                 
                 if (res[cat] && res[cat].data[index]) {
                   res[cat].data[index].totalValue += converted;
@@ -372,7 +369,7 @@ const EditModal = ({ isOpen, onClose, data, type, onSave }: any) => {
         });
     } else if (isOpen) {
         setFormData({
-            owner: 'husband',
+            owner: type?.owner || 'husband', // 接收從按鈕傳來的預設 Owner
             type: type === 'plan' ? 'expense' : 'cash',
             currency: 'TWD',
             amount: '',
@@ -525,7 +522,7 @@ export default function App() {
   const [displayCurrency, setDisplayCurrency] = useState('TWD');
 
   const [showSettings, setShowSettings] = useState(false);
-  const [editModal, setEditModal] = useState<{isOpen: boolean, type: string, data: any}>({ isOpen: false, type: 'asset', data: null });
+  const [editModal, setEditModal] = useState<{isOpen: boolean, type: any, data: any}>({ isOpen: false, type: 'asset', data: null });
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(STORAGE_KEY_API);
@@ -605,6 +602,7 @@ export default function App() {
         else newList.push({ ...formData, id: 'temp_'+Date.now() });
     }
     
+    // 即時更新 History (Optimistic UI)
     const newHistory = [...data.history];
     if (newHistory.length > 0) {
         const lastIdx = newHistory.length - 1;
@@ -792,7 +790,7 @@ export default function App() {
             <Banknote size={22}/>
           </button>
           <button 
-             onClick={() => setEditModal({ isOpen: true, type: 'asset', data: { owner: selectedOwner === 'all' ? 'husband' : selectedOwner } })}
+             onClick={() => setEditModal({ isOpen: true, type: { owner: selectedOwner === 'all' ? 'husband' : selectedOwner }, data: null })}
              className="w-14 h-14 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-90 transition-transform"
              title="新增資產"
           >
